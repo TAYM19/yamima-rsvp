@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>אצל סבתא ימימה</title>
+<link rel="icon" href="logo.svg">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:#faf8f2;color:#1c2c52;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;min-height:100vh}
+.top{text-align:center;padding:28px 20px 16px;background:linear-gradient(#c9d6ee,#f2f4f8 75%,#faf8f2)}
+.logo{width:120px;height:120px;border-radius:28px;box-shadow:0 3px 10px #0004;object-fit:cover}
+h1{margin:10px 0 0;font-size:26px}
+.sub{color:#5a6785;margin-top:4px}
+.wrap{max-width:480px;margin:0 auto;padding-bottom:30px}
+.card{margin:0 16px;background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 8px #0002}
+.card h2{margin:0 0 10px;font-size:16px}
+input[type=text]{width:100%;border:1px solid #ddd;border-radius:10px;padding:12px;font-size:16px;margin-bottom:10px;font-family:inherit}
+.row{display:flex;align-items:center;justify-content:space-between;border:1px solid #ddd;border-radius:10px;padding:8px 12px;margin-bottom:12px}
+.row span{color:#666}
+.step{display:flex;align-items:center;gap:14px;font-size:20px;font-weight:700}
+.step button{width:34px;height:34px;border-radius:50%;border:1px solid #244078;background:#fff;color:#244078;font-size:20px;line-height:1;padding:0}
+.go{width:100%;background:#244078;color:#fff;border:0;border-radius:10px;padding:13px;font-size:16px;font-weight:700;font-family:inherit}
+.go:disabled{opacity:.6}
+.msg{min-height:18px;margin-top:8px;font-size:14px;text-align:center}
+.err{color:#b3261e}.ok{color:#1b6b34}
+.list{margin:16px}
+.list h3{margin:0 0 8px;font-size:16px}
+.item{background:#fff;border-radius:12px;padding:12px;margin-bottom:6px;display:flex;justify-content:space-between;gap:10px}
+.item .n{color:#244078;white-space:nowrap}
+.item .nm{overflow-wrap:anywhere}
+.empty{color:#5a6785;text-align:center;padding:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div class="top">
+  <img class="logo" id="logo" src="logo.svg" alt="">
+  <h1>אצל סבתא ימימה</h1>
+  <div class="sub">ארוחת שישי · מי מגיע?</div>
+ </div>
+ <div class="card">
+  <h2>אני מגיע/ה</h2>
+  <input type="text" id="name" maxlength="40" placeholder="השם שלי" autocomplete="off">
+  <div class="row"><span>כמה אנשים מגיעים (כולל אותי)?</span>
+   <div class="step"><button type="button" id="plus" aria-label="הוסף">+</button><b id="cnt">1</b><button type="button" id="minus" aria-label="הפחת">−</button></div>
+  </div>
+  <button class="go" id="send" type="button">אישור הגעה</button>
+  <div class="msg" id="msg"></div>
+ </div>
+ <div class="list">
+  <h3 id="total">מי מגיע</h3>
+  <div id="items"></div>
+ </div>
+</div>
+<script>
+const SUPABASE_URL = "https://nultdlgatdjvpvrjdbyb.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im51bHRkbGdhdGRqdnB2cmpkYnliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwODcwMTMsImV4cCI6MjEwNzY2MzAxM30.f1VODYuq7lN2EX5iLmHNse-Ych6JaNOTrxp0eSJNRmA";
+const H = {apikey:SUPABASE_KEY, Authorization:"Bearer "+SUPABASE_KEY, "Content-Type":"application/json"};
+const $ = id => document.getElementById(id);
+let count = 1;
+function setCount(n){count=Math.max(1,Math.min(20,n));$("cnt").textContent=count}
+$("plus").onclick=()=>setCount(count+1);
+$("minus").onclick=()=>setCount(count-1);
+function label(n){return n===1?"אחד":n+" אנשים"}
+function say(t,cls){const m=$("msg");m.textContent=t;m.className="msg "+(cls||"")}
+async function load(){
+  try{
+    const r=await fetch(SUPABASE_URL+"/rest/v1/rsvps?select=id,name,people&order=created_at.asc",{headers:H});
+    if(!r.ok) throw new Error(r.status);
+    const rows=await r.json();
+    const box=$("items");box.textContent="";
+    let sum=0;
+    rows.forEach(x=>{
+      sum+=x.people;
+      const d=document.createElement("div");d.className="item";
+      const a=document.createElement("span");a.className="nm";a.textContent=x.name;
+      const b=document.createElement("span");b.className="n";b.textContent=label(x.people);
+      d.append(a,b);box.append(d);
+    });
+    if(!rows.length){const e=document.createElement("div");e.className="empty";e.textContent="עוד אף אחד לא נרשם";box.append(e)}
+    $("total").textContent=rows.length?("מי מגיע (סה\"כ "+sum+" אנשים)"):"מי מגיע";
+  }catch(e){say("לא הצלחתי לטעון את הרשימה","err")}
+}
+$("send").onclick=async()=>{
+  const name=$("name").value.trim();
+  if(!name){say("כתבו את השם","err");return}
+  $("send").disabled=true;say("שולח...");
+  try{
+    const r=await fetch(SUPABASE_URL+"/rest/v1/rsvps",{method:"POST",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify({name:name.slice(0,40),people:count})});
+    if(!r.ok) throw new Error(r.status);
+    $("name").value="";setCount(1);say("נרשמת, תודה!","ok");await load();
+  }catch(e){say("השליחה נכשלה, נסו שוב","err")}
+  $("send").disabled=false;
+};
+load();setInterval(load,20000);
+</script>
+</body>
+</html>
