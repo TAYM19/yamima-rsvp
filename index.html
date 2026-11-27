@@ -26,6 +26,7 @@ input[type=text]{width:100%;border:1px solid #ddd;border-radius:10px;padding:12p
 .msg{min-height:18px;margin-top:8px;font-size:14px;text-align:center}
 .err{color:#b3261e}.ok{color:#1b6b34}
 .list{margin:16px}
+.sum{background:#14284b;color:#f5d27a;border-radius:14px;padding:12px;text-align:center;font-size:20px;font-weight:700;margin-bottom:12px}
 .list h3{margin:0 0 8px;font-size:16px}
 .item{background:#fff;border-radius:12px;padding:12px;margin-bottom:6px;display:flex;justify-content:space-between;gap:10px}
 .item .n{color:#244078;white-space:nowrap}
@@ -50,6 +51,7 @@ input[type=text]{width:100%;border:1px solid #ddd;border-radius:10px;padding:12p
   <div class="msg" id="msg"></div>
  </div>
  <div class="list">
+  <div class="sum" id="sum">סה״כ מגיעים: 0</div>
   <h3 id="total">מי מגיע</h3>
   <div id="items"></div>
  </div>
@@ -80,6 +82,7 @@ async function load(){
       d.append(a,b);box.append(d);
     });
     if(!rows.length){const e=document.createElement("div");e.className="empty";e.textContent="עוד אף אחד לא נרשם";box.append(e)}
+    $("sum").textContent="סה״כ מגיעים: "+sum;
     $("total").textContent=rows.length?("מי מגיע (סה\"כ "+sum+" אנשים)"):"מי מגיע";
   }catch(e){say("לא הצלחתי לטעון את הרשימה","err")}
 }
