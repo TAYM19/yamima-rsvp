@@ -36,10 +36,13 @@ input[type=text]{width:100%;border:1px solid #ddd;border-radius:10px;padding:12p
 .empty{color:#5a6785;text-align:center;padding:12px}
 .seg{display:flex;gap:8px;margin-bottom:10px}
 .seg button{flex:1;padding:11px;border-radius:10px;border:1px solid #244078;background:#fff;color:#244078;font-size:16px;font-weight:700;font-family:inherit}
-.seg button.on{background:#244078;color:#fff}
-.seg button.on.no{background:#8a3b3b;border-color:#8a3b3b}
-.item.no{opacity:.75}.item.no .n{color:#8a3b3b}
+#yes{border-color:#1b8a3a;color:#1b8a3a}
+#yes.on{background:#1b8a3a;color:#fff}
+#no{border-color:#c62828;color:#c62828}
+#no.on{background:#c62828;color:#fff}
+.item.no{opacity:.75}.item.no .n{color:#c62828}
 .edit{background:none;border:1px solid #c9a24a;color:#7a5b10;border-radius:8px;padding:4px 10px;font-size:14px;font-family:inherit;margin-inline-start:8px}
+.del{background:none;border:1px solid #b3261e;color:#b3261e;border-radius:8px;padding:4px 10px;font-size:14px;font-family:inherit;margin-inline-start:8px}
 .cancel{display:none;text-align:center;margin-top:8px;color:#5a6785;font-size:14px;text-decoration:underline;cursor:pointer}
 </style>
 </head>
@@ -53,7 +56,7 @@ input[type=text]{width:100%;border:1px solid #ddd;border-radius:10px;padding:12p
  <div class="card">
   <h2 id="ftitle">אישור הגעה</h2>
   <input type="text" id="name" maxlength="40" placeholder="השם שלי" autocomplete="off">
-  <div class="seg"><button type="button" id="yes" class="on">מגיע/ה</button><button type="button" id="no">לא מגיע/ה</button></div>
+  <div class="seg"><button type="button" id="yes" class="on">מגיעים</button><button type="button" id="no">לא מגיעים</button></div>
   <div class="row" id="cntrow"><span>כמה אנשים מגיעים (כולל אותי)?</span>
    <div class="step"><button type="button" id="plus" aria-label="הוסף">+</button><b id="cnt">1</b><button type="button" id="minus" aria-label="הפחת">−</button></div>
   </div>
@@ -87,6 +90,18 @@ function say(t,cls){const m=$("msg");m.textContent=t;m.className="msg "+(cls||""
 function resetForm(){editing=null;$("name").value="";setCount(1);setAtt(true);$("send").textContent="אישור";$("ftitle").textContent="אישור הגעה";$("cancel").style.display="none"}
 function startEdit(x){editing=x.id;$("name").value=x.name;setAtt(x.attending);setCount(x.people>0?x.people:1);$("send").textContent="שמירת שינויים";$("ftitle").textContent="עריכת הרישום שלי";$("cancel").style.display="block";say("");window.scrollTo({top:0,behavior:"smooth"})}
 $("cancel").onclick=()=>{resetForm();say("")};
+async function doDelete(id){
+  const mine=getMine();
+  try{
+    const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/delete_rsvp",{method:"POST",headers:H,body:JSON.stringify({p_id:id,p_token:mine[id]||""})});
+    if(!r.ok) throw new Error(r.status);
+    const ok=await r.json();
+    delete mine[id];setMine(mine);
+    if(editing===id) resetForm();
+    say(ok?"הרישום נמחק":"הרישום לא נמצא","ok");
+    await load();
+  }catch(e){say("המחיקה נכשלה, נסו שוב","err")}
+}
 function render(){
   const mine=getMine(), box=$("items");box.textContent="";
   let sum=0;
@@ -96,9 +111,11 @@ function render(){
     const d=document.createElement("div");d.className="item"+(x.attending?"":" no");
     const a=document.createElement("span");a.className="nm";a.textContent=x.name;
     const r=document.createElement("span");
-    const b=document.createElement("span");b.className="n";b.textContent=x.attending?label(x.people):"לא מגיע/ה";
+    const b=document.createElement("span");b.className="n";b.textContent=x.attending?label(x.people):"לא מגיעים";
     r.append(b);
-    if(mine[x.id]){const e=document.createElement("button");e.className="edit";e.type="button";e.textContent="עריכה";e.onclick=()=>startEdit(x);r.append(e)}
+    if(mine[x.id]){const e=document.createElement("button");e.className="edit";e.type="button";e.textContent="עריכה";e.onclick=()=>startEdit(x);r.append(e);
+      const g=document.createElement("button");g.className="del";g.type="button";g.textContent="מחיקה";
+      g.onclick=()=>{if(g.dataset.sure){doDelete(x.id)}else{g.dataset.sure="1";g.textContent="בטוח? לחצו שוב למחיקה";setTimeout(()=>{g.dataset.sure="";g.textContent="מחיקה"},5000)}};r.append(g)}
     d.append(a,r);box.append(d);
   });
   if(!rows.length){const e=document.createElement("div");e.className="empty";e.textContent="עוד אף אחד לא נרשם";box.append(e)}
@@ -134,7 +151,7 @@ $("send").onclick=async()=>{
       if(!r.ok) throw new Error(r.status);
       const j=await r.json();
       if(j&&j[0]){const mine=getMine();mine[j[0].id]=token;setMine(mine)}
-      resetForm();say(attending?"נרשמת, תודה!":"עדכנו שאת/ה לא מגיע/ה, תודה!","ok");
+      resetForm();say(attending?"נרשמת, תודה!":"עדכנו שלא מגיעים, תודה!","ok");
     }
     await load();
   }catch(e){say("השליחה נכשלה, נסו שוב","err")}
