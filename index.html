@@ -34,6 +34,13 @@ input[type=text]{width:100%;border:1px solid #ddd;border-radius:10px;padding:12p
 .item .n{color:#244078;white-space:nowrap}
 .item .nm{overflow-wrap:anywhere}
 .empty{color:#5a6785;text-align:center;padding:12px}
+.seg{display:flex;gap:8px;margin-bottom:10px}
+.seg button{flex:1;padding:11px;border-radius:10px;border:1px solid #244078;background:#fff;color:#244078;font-size:16px;font-weight:700;font-family:inherit}
+.seg button.on{background:#244078;color:#fff}
+.seg button.on.no{background:#8a3b3b;border-color:#8a3b3b}
+.item.no{opacity:.75}.item.no .n{color:#8a3b3b}
+.edit{background:none;border:1px solid #c9a24a;color:#7a5b10;border-radius:8px;padding:4px 10px;font-size:14px;font-family:inherit;margin-inline-start:8px}
+.cancel{display:none;text-align:center;margin-top:8px;color:#5a6785;font-size:14px;text-decoration:underline;cursor:pointer}
 </style>
 </head>
 <body>
@@ -44,17 +51,19 @@ input[type=text]{width:100%;border:1px solid #ddd;border-radius:10px;padding:12p
   <div class="sub">ארוחת שישי · מי מגיע?</div>
  </div>
  <div class="card">
-  <h2>אני מגיע/ה</h2>
+  <h2 id="ftitle">אישור הגעה</h2>
   <input type="text" id="name" maxlength="40" placeholder="השם שלי" autocomplete="off">
-  <div class="row"><span>כמה אנשים מגיעים (כולל אותי)?</span>
+  <div class="seg"><button type="button" id="yes" class="on">מגיע/ה</button><button type="button" id="no">לא מגיע/ה</button></div>
+  <div class="row" id="cntrow"><span>כמה אנשים מגיעים (כולל אותי)?</span>
    <div class="step"><button type="button" id="plus" aria-label="הוסף">+</button><b id="cnt">1</b><button type="button" id="minus" aria-label="הפחת">−</button></div>
   </div>
-  <button class="go" id="send" type="button">אישור הגעה</button>
+  <button class="go" id="send" type="button">אישור</button>
+  <div class="cancel" id="cancel">ביטול עריכה</div>
   <div class="msg" id="msg"></div>
  </div>
  <div class="list">
   <div class="sum" id="sum">סה״כ מגיעים: 0</div>
-  <h3 id="total">מי מגיע</h3>
+  <h3>הרשימה</h3>
   <div id="items"></div>
  </div>
 </div>
@@ -63,39 +72,71 @@ const SUPABASE_URL = "https://nultdlgatdjvpvrjdbyb.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im51bHRkbGdhdGRqdnB2cmpkYnliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwODcwMTMsImV4cCI6MjEwNzY2MzAxM30.f1VODYuq7lN2EX5iLmHNse-Ych6JaNOTrxp0eSJNRmA";
 const H = {apikey:SUPABASE_KEY, Authorization:"Bearer "+SUPABASE_KEY, "Content-Type":"application/json"};
 const $ = id => document.getElementById(id);
-let count = 1;
+let count=1, attending=true, editing=null, rowsCache=[];
+function getMine(){try{return JSON.parse(localStorage.getItem("yamima_mine")||"{}")}catch(e){return {}}}
+function setMine(m){try{localStorage.setItem("yamima_mine",JSON.stringify(m))}catch(e){}}
+function uid(){return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2))}
 function setCount(n){count=Math.max(1,Math.min(20,n));$("cnt").textContent=count}
+function setAtt(a){attending=a;$("yes").className=a?"on":"";$("no").className=a?"no":"on no";$("cntrow").style.display=a?"":"none"}
 $("plus").onclick=()=>setCount(count+1);
 $("minus").onclick=()=>setCount(count-1);
+$("yes").onclick=()=>setAtt(true);
+$("no").onclick=()=>setAtt(false);
 function label(n){return n===1?"אחד":n+" אנשים"}
 function say(t,cls){const m=$("msg");m.textContent=t;m.className="msg "+(cls||"")}
+function resetForm(){editing=null;$("name").value="";setCount(1);setAtt(true);$("send").textContent="אישור";$("ftitle").textContent="אישור הגעה";$("cancel").style.display="none"}
+function startEdit(x){editing=x.id;$("name").value=x.name;setAtt(x.attending);setCount(x.people>0?x.people:1);$("send").textContent="שמירת שינויים";$("ftitle").textContent="עריכת הרישום שלי";$("cancel").style.display="block";say("");window.scrollTo({top:0,behavior:"smooth"})}
+$("cancel").onclick=()=>{resetForm();say("")};
+function render(){
+  const mine=getMine(), box=$("items");box.textContent="";
+  let sum=0;
+  const rows=rowsCache.slice().sort((a,b)=>(b.attending-a.attending));
+  rows.forEach(x=>{
+    if(x.attending) sum+=x.people;
+    const d=document.createElement("div");d.className="item"+(x.attending?"":" no");
+    const a=document.createElement("span");a.className="nm";a.textContent=x.name;
+    const r=document.createElement("span");
+    const b=document.createElement("span");b.className="n";b.textContent=x.attending?label(x.people):"לא מגיע/ה";
+    r.append(b);
+    if(mine[x.id]){const e=document.createElement("button");e.className="edit";e.type="button";e.textContent="עריכה";e.onclick=()=>startEdit(x);r.append(e)}
+    d.append(a,r);box.append(d);
+  });
+  if(!rows.length){const e=document.createElement("div");e.className="empty";e.textContent="עוד אף אחד לא נרשם";box.append(e)}
+  $("sum").textContent="סה״כ מגיעים: "+sum;
+}
 async function load(){
   try{
-    const r=await fetch(SUPABASE_URL+"/rest/v1/rsvps?select=id,name,people&order=created_at.asc",{headers:H});
+    const r=await fetch(SUPABASE_URL+"/rest/v1/rsvps?select=id,name,people,attending&order=created_at.asc",{headers:H});
     if(!r.ok) throw new Error(r.status);
-    const rows=await r.json();
-    const box=$("items");box.textContent="";
-    let sum=0;
-    rows.forEach(x=>{
-      sum+=x.people;
-      const d=document.createElement("div");d.className="item";
-      const a=document.createElement("span");a.className="nm";a.textContent=x.name;
-      const b=document.createElement("span");b.className="n";b.textContent=label(x.people);
-      d.append(a,b);box.append(d);
-    });
-    if(!rows.length){const e=document.createElement("div");e.className="empty";e.textContent="עוד אף אחד לא נרשם";box.append(e)}
-    $("sum").textContent="סה״כ מגיעים: "+sum;
-    $("total").textContent=rows.length?("מי מגיע (סה\"כ "+sum+" אנשים)"):"מי מגיע";
+    rowsCache=await r.json();
+    const mine=getMine(),ids=new Set(rowsCache.map(x=>String(x.id)));let ch=false;
+    Object.keys(mine).forEach(k=>{if(!ids.has(k)){delete mine[k];ch=true}});
+    if(ch)setMine(mine);
+    render();
   }catch(e){say("לא הצלחתי לטעון את הרשימה","err")}
 }
 $("send").onclick=async()=>{
   const name=$("name").value.trim();
   if(!name){say("כתבו את השם","err");return}
+  const people=attending?count:0;
   $("send").disabled=true;say("שולח...");
   try{
-    const r=await fetch(SUPABASE_URL+"/rest/v1/rsvps",{method:"POST",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify({name:name.slice(0,40),people:count})});
-    if(!r.ok) throw new Error(r.status);
-    $("name").value="";setCount(1);say("נרשמת, תודה!","ok");await load();
+    if(editing){
+      const mine=getMine();
+      const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/update_rsvp",{method:"POST",headers:H,body:JSON.stringify({p_id:editing,p_token:mine[editing]||"",p_name:name.slice(0,40),p_people:people,p_attending:attending})});
+      if(!r.ok) throw new Error(r.status);
+      const ok=await r.json();
+      if(!ok){delete mine[editing];setMine(mine);resetForm();say("הרישום לא נמצא (אולי הרשימה התאפסה). אפשר להירשם מחדש","err")}
+      else{resetForm();say("השינוי נשמר, תודה!","ok")}
+    }else{
+      const token=uid();
+      const r=await fetch(SUPABASE_URL+"/rest/v1/rsvps?select=id",{method:"POST",headers:{...H,Prefer:"return=representation"},body:JSON.stringify({name:name.slice(0,40),people:people,attending:attending,token:token})});
+      if(!r.ok) throw new Error(r.status);
+      const j=await r.json();
+      if(j&&j[0]){const mine=getMine();mine[j[0].id]=token;setMine(mine)}
+      resetForm();say(attending?"נרשמת, תודה!":"עדכנו שאת/ה לא מגיע/ה, תודה!","ok");
+    }
+    await load();
   }catch(e){say("השליחה נכשלה, נסו שוב","err")}
   $("send").disabled=false;
 };
