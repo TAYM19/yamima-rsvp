@@ -1,0 +1,1 @@
+{"rewrites":[{"source":"/apple-touch-icon.png","destination":"/api/icon"},{"source":"/apple-touch-icon-precomposed.png","destination":"/api/icon"}]}
